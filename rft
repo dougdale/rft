@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+import yaml
+import pandas as pd
+
+def parse_currency(value):
+    """Parse a currency string into a float."""
+    if isinstance(value, str):
+        return float(value.replace(',', '').replace('$', ''))
+    return float(value)
+
+def calculate_totals(filename):
+    with open(filename, 'r') as file:
+        data = yaml.safe_load(file)
+
+    # Create a pandas dataframe that included the totals from each institution
+
+    df = pd.DataFrame()
+
+    for institution in data['institutions']:
+        # Add a new row to the dataframe for each institution
+
+        accounts = institution.get('accounts', {})
+        institution_total = 0
+        for _, value in accounts.items():
+            institution_total += parse_currency(value)
+    
+        allocations = institution.get('allocations', {})
+        asset_classes = []
+        asset_amounts = []
+        for asset_class, percentage in allocations.items():
+            asset_classes.append(asset_class)
+            asset_amounts.append(institution_total * (percentage / 100))
+
+        allocation_df = pd.DataFrame(index=[institution['name']], columns=asset_classes, data=[asset_amounts])
+
+        df = pd.concat([df, allocation_df], axis=0)
+
+    return df 
+
+if __name__ == "__main__":
+    total = calculate_totals("2025-11.yaml")
+    print(total)
