@@ -35,6 +35,9 @@ def calculate_totals(filename):
 
         df = pd.concat([df, allocation_df], axis=0)
 
+    df = df.fillna(0)
+    df = df.round(2)
+
     return df 
 
 if __name__ == "__main__":
