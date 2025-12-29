@@ -58,8 +58,11 @@ def calculate_rebalance_values(allocation_df, grand_total, filename):
     # Assume any asset class not specified in targets is Bonds
     target_amounts['Bonds'] = grand_total - sum(target_amounts.values())
 
-    for asset_class in allocation_df.columns:
-        current_amount = allocation_df[asset_class].sum()
+    for asset_class in target_amounts.keys():
+        try:
+            current_amount = allocation_df[asset_class].sum()
+        except KeyError:
+            current_amount = 0.0
         target_amount = target_amounts.get(asset_class, 0)
         rebalance_df.at['Rebalance', asset_class] = round(target_amount - current_amount, 2)
 
