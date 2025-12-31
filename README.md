@@ -1,2 +1,2 @@
-# rat
+# rft
 Retirement Funds Tracker

@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+import yaml
+import pandas as pd
+
+def parse_currency(value):
+    """Parse a currency string into a float."""
+    if isinstance(value, str):
+        return float(value.replace(',', '').replace('$', ''))
+    return float(value)
+
+def calculate_totals(filename):
+    with open(filename, 'r') as file:
+        data = yaml.safe_load(file)
+
+    # Create a pandas dataframe that included the totals from each institution
+
+    df = pd.DataFrame()
+
+    for institution in data['institutions']:
+        # Add a new row to the dataframe for each institution
+
+        accounts = institution.get('accounts', {})
+        institution_total = 0
+        for _, value in accounts.items():
+            institution_total += parse_currency(value)
+    
+        allocations = institution.get('allocations', {})
+        asset_classes = []
+        asset_amounts = []
+        for asset_class, percentage in allocations.items():
+            asset_classes.append(asset_class)
+            asset_amounts.append(institution_total * (percentage / 100))
+
+        allocation_df = pd.DataFrame(index=[institution['name']], columns=asset_classes, data=[asset_amounts])
+
+        df = pd.concat([df, allocation_df], axis=0)
+
+    df = df.fillna(0)
+    df = df.round(2)
+
+    return df 
+
+def calculate_rebalance_values(allocation_df, grand_total, filename):
+    with open(filename, 'r') as file:
+        data = yaml.safe_load(file)
+
+    targets = data.get('targets', {})
+    target_amounts = {}
+    for asset_class, target in targets.items():
+        if isinstance(target, str) and target.endswith('%'):
+            percentage = float(target.replace('%', ''))
+            target_amounts[asset_class] = grand_total * (percentage / 100)
+        else:
+            target_amounts[asset_class] = parse_currency(target)
+
+    rebalance_df = pd.DataFrame(index=['Rebalance'], columns=allocation_df.columns)
+
+    # Assume any asset class not specified in targets is Bonds
+    target_amounts['Bonds'] = grand_total - sum(target_amounts.values())
+
+    for asset_class in target_amounts.keys():
+        try:
+            current_amount = allocation_df[asset_class].sum()
+        except KeyError:
+            current_amount = 0.0
+        target_amount = target_amounts.get(asset_class, 0)
+        rebalance_df.at['Rebalance', asset_class] = round(target_amount - current_amount, 2)
+
+    return rebalance_df
+
+def calculate_allocation_totals(df):
+    # Create a dataframe that sums the allocations across all institutions
+    allocation_df = pd.DataFrame(df.sum()).T
+    allocation_df = allocation_df.round(2)
+    # Set index 0 as 'Total'
+    allocation_df.index = ['Total']
+    return allocation_df
+
+if __name__ == "__main__":
+    total = calculate_totals("2025-11.yaml")
+    print(total)
+
+    allocation_totals = calculate_allocation_totals(total)
+    print("\nAllocation Totals:")
+    print(allocation_totals)
+
+    grand_total = allocation_totals.sum(axis=1).values[0]
+    print(f"\nGrand Total: ${grand_total:,.2f}")
+
+    rebalance_values = calculate_rebalance_values(allocation_totals, grand_total, "2025-11.yaml")
+    print("\nRebalance Values:")
+    print(rebalance_values)
